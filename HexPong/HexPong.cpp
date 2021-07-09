@@ -297,6 +297,7 @@ namespace OpenGL
 		BallRenderer ballRenderer;
 		float offsets[6];
 		Math::vec2<float> ball;
+		Math::vec2<float> v;
 
 		std::mt19937_64 mt;
 		std::uniform_real_distribution<float> rd;
@@ -315,6 +316,17 @@ namespace OpenGL
 			rd1(-0.5, 0.5)
 		{
 		}
+
+		bool isInHexagon()
+		{
+			using namespace Math;
+
+
+			if (abs(0 - 2 * Pi) < 0.05)
+				return true;//...
+			else return false;
+		}
+
 		virtual void init(FrameScale const& _size) override
 		{
 			glViewport(0, 0, _size.w, _size.h);
@@ -395,6 +407,13 @@ namespace OpenGL
 
 int main()
 {
+	using namespace Math;
+
+	vec2<float> a{ .5f, 1.f };
+	vec2<float> b{ 1.f, .5f };
+
+	printf("%f\n", acos((a, b) / (a.length() * b.length())));
+
 	OpenGL::OpenGLInit init(4, 5);
 	Window::Window::Data winParameters
 	{
@@ -407,7 +426,7 @@ int main()
 	Window::WindowManager wm(winParameters);
 	OpenGL::HexPong test;
 	wm.init(0, &test);
-	glfwSwapInterval(12);
+	glfwSwapInterval(6);
 	FPS fps;
 	fps.refresh();
 	while (!wm.close())
