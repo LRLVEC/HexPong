@@ -78,9 +78,9 @@ namespace OpenGL
 			VertexAttrib positions;
 			VertexAttrib colors;
 
-			BorderRenderer(SourceManager* _sourceManage)
+			BorderRenderer(SourceManager* _sourceManager)
 				:
-				Program(_sourceManage, "Border", Vector<VertexAttrib*>{&positions, & colors}),
+				Program(_sourceManager, "Border", Vector<VertexAttrib*>{&positions, & colors}),
 				borderLines(),
 				trans({ {60.0,0.1,100},{0.05,0.8,0.05},{0.03},500.0 }),
 				buffer(&borderLines),
@@ -208,9 +208,9 @@ namespace OpenGL
 
 			VertexAttrib positions;
 
-			PlayerRenderer(SourceManager* _sourceManage)
+			PlayerRenderer(SourceManager* _sourceManager)
 				:
-				Program(_sourceManage, "Player", Vector<VertexAttrib*>{&positions}),
+				Program(_sourceManager, "Player", Vector<VertexAttrib*>{&positions}),
 				playerTriangles(),
 				playerOffset(),
 				rectangleBuffer(&playerTriangles),
@@ -236,32 +236,98 @@ namespace OpenGL
 			}
 		};
 
+		struct BallRenderer :Program
+		{
+			struct BallData :Buffer::Data
+			{
+				Math::vec2<float> position;
+				BallData()
+					:
+					Data(DynamicDraw),
+					position{ 0 }
+				{
+				}
+				void update(Math::vec2<float>pos)
+				{
+					position = pos * scale;
+				}
+				virtual void* pointer()override
+				{
+					return (void*)position.data;
+				}
+				virtual unsigned int size()override
+				{
+					return sizeof(position);
+				}
+			};
+
+			BallData ballPos;
+			Buffer ballBuffer;
+			BufferConfig bufferArray;
+			VertexAttrib positions;
+
+			BallRenderer(SourceManager* _SourceManager)
+				:
+				Program(_SourceManager, "Ball", Vector<VertexAttrib*>{&positions}),
+				ballPos(),
+				ballBuffer(&ballPos),
+				bufferArray(&ballBuffer, ArrayBuffer),
+				positions(&bufferArray, 0, VertexAttrib::two,
+					VertexAttrib::Float, false, sizeof(Math::vec2<float>), 0, 0)
+			{
+				init();
+			}
+			void refreshBuffer(Math::vec2<float>pos)
+			{
+				ballPos.update(pos);
+				bufferArray.refreshData();
+			}
+			virtual void initBufferData()override
+			{
+			}
+			virtual void run() override
+			{
+				glDrawArrays(GL_POINTS, 0, 1);
+			}
+		};
+
 		SourceManager sm;
 		BorderRenderer renderer;
 		PlayerRenderer playerRenderer;
+		BallRenderer ballRenderer;
 		float offsets[6];
+		Math::vec2<float> ball;
 
 		std::mt19937_64 mt;
 		std::uniform_real_distribution<float> rd;
+		std::uniform_real_distribution<float> rd1;
 
 		HexPong()
 			:
 			sm(),
 			renderer(&sm),
 			playerRenderer(&sm),
+			ballRenderer(&sm),
 			offsets{ 0 },
+			ball{ 0 },
 			mt(time(nullptr)),
-			rd(-1 + playerW, 1 - playerW)
+			rd(-1 + playerW, 1 - playerW),
+			rd1(-0.5, 0.5)
 		{
 		}
 		virtual void init(FrameScale const& _size) override
 		{
 			glViewport(0, 0, _size.w, _size.h);
+			glPointSize(20);
+
 			renderer.trans.init(_size);
 			renderer.transformUnifrom.dataInit();
 			renderer.bufferArray.dataInit();
+
 			playerRenderer.bufferArray.dataInit();
 			playerRenderer.offsetUniform.dataInit();
+
+			ballRenderer.bufferArray.dataInit();
 		}
 		virtual void run() override
 		{
@@ -271,12 +337,20 @@ namespace OpenGL
 			for (unsigned int c0(0); c0 < 6; ++c0)
 				offsets[c0] = rd(mt);
 
+			ball.data[0] = rd1(mt);
+			ball.data[1] = rd1(mt);
+
 			renderer.use();
 			renderer.refreshBuffer();
 			renderer.run();
+
 			playerRenderer.use();
 			playerRenderer.refreshBuffer(offsets);
 			playerRenderer.run();
+
+			ballRenderer.use();
+			ballRenderer.refreshBuffer(ball);
+			ballRenderer.run();
 		}
 		virtual void frameSize(int _w, int _h) override
 		{
@@ -333,7 +407,7 @@ int main()
 	Window::WindowManager wm(winParameters);
 	OpenGL::HexPong test;
 	wm.init(0, &test);
-	glfwSwapInterval(1);
+	glfwSwapInterval(12);
 	FPS fps;
 	fps.refresh();
 	while (!wm.close())
