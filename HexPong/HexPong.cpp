@@ -17,11 +17,16 @@ namespace OpenGL
 	constexpr Color blue = { 0.f, 0.f, 1.f };
 	constexpr Color purple = { 127.f / 255.f, 0.f, 1.f };
 
-	constexpr double scale = 0.9f;
-	constexpr double playerW = 0.2f;
-	constexpr double playerH = 0.05f;
+	constexpr double scale = 0.9;
+	constexpr double playerW = 0.3;
+	constexpr double playerH = 0.05;
+	constexpr double playerWHalf = playerW / 2;
 	constexpr double frameRate = 144;
 	constexpr double dt = 144 * 0.005 / frameRate;
+	constexpr double dt2 = dt * dt * 0.5;
+	constexpr double G = 0.1;
+	constexpr double r0 = 0.1;
+	constexpr double r03 = r0 * r0 * r0;
 	constexpr double leftLimit = playerW - 1;
 	constexpr double rightLimit = 1 - playerW;
 	constexpr double playerSpeed = 2.0;
@@ -67,15 +72,144 @@ namespace OpenGL
 		}
 	};
 
-
 	struct Player
 	{
 		virtual Movement update()
 		{
-
 			return Stop;
 		};
 	};
+	struct Physics
+	{
+		struct LineSegment
+		{
+			using vec2 = Math::vec2<double>;
+			struct Intersection
+			{
+				using vec2 = Math::vec2<double>;
+
+				bool intersected;
+				double t1, t2;
+				vec2 point;
+				Intersection()
+					:
+					intersected(false),
+					t1(0),
+					t2(0),
+					point{ 0 }
+				{
+				}
+			};
+
+			vec2 A, B;
+
+			LineSegment() = default;
+			LineSegment(vec2 _A, vec2 _B)
+				:
+				A(_A),
+				B(_B)
+			{
+
+			}
+			Intersection intersect(LineSegment b)
+			{
+				Intersection r;
+				//todo: pre-test
+				double l1((B - A).length()), l2((b.B - b.A).length());
+				vec2 k1((B - A) / l1), k2((b.B - b.A) / l2);
+				vec2 d(A - b.A);
+				double s(k2[0] * k1[1] - k1[0] * k2[1]);
+				if (s == 0)
+				{
+					r.intersected = false;
+					return r;
+				}
+				r.t1 = (d[0] * k2[1] - k2[0] * d[1]) / s;
+				r.t2 = (d[0] * k1[1] - k1[0] * d[1]) / s;
+				r.point = (A + k1 * r.t1 + b.A + k2 * r.t2) / 2;
+				if (r.t1 < 0 || r.t1 > l1 || r.t2 < 0 || r.t2 > l2)
+					r.intersected = false;
+				else
+					r.intersected = true;
+				return r;
+			}
+		};
+		LineSegment lines[6];
+		Math::vec2<double> r;
+		Math::vec2<double> v;
+		double offsets[6];
+		Input inputs[6];
+		LineSegment::Intersection its[6];
+
+		Physics()
+			:
+			r{ 0.1, 0 },
+			v{ 0, -ballSpeed },
+			offsets{ 0 },
+			its{}
+		{
+			double h = sqrt(3) / 2;
+
+			Math::vec2<double> vertices[6];
+
+			vertices[0] = { -0.5, -h };
+			vertices[1] = { 0.5, -h };
+			vertices[2] = { 1, 0 };
+			vertices[3] = { 0.5, h };
+			vertices[4] = { -0.5, h };
+			vertices[5] = { -1, 0 };
+			for (unsigned int c0(0); c0 < 6; ++c0)
+			{
+				lines[c0].A = vertices[c0];
+				lines[c0].B = vertices[(c0 + 1) % 6];
+			}
+		}
+		void update(Player** players)
+		{
+			using namespace Math;
+			double rr(r.length());
+			vec2<double> a;
+			if (rr > r0)a = r * (G / pow(rr, 3));
+			else a = r * (G / r03);
+			vec2<double> r1 = r + v * dt + a * dt2;
+			v += a * dt;
+
+			bool flag(true);
+			LineSegment dr(r, r1);
+			for (unsigned int c0(0); c0 < 6; ++c0)
+				its[c0] = dr.intersect(lines[c0]);
+			for (unsigned int c0(0); c0 < 6; ++c0)
+				offsets[c0] = inputs[c0].update(players[c0]->update());
+			for (unsigned int c0(0); c0 < 6; ++c0)
+			{
+				if (its[c0].intersected)
+				{
+					double offset(its[c0].t2 - (offsets[c0] + 1) / 2);
+					if (abs(offset) < playerWHalf)
+					{
+						double theta((Math::Pi * c0) / 3);
+						vec2<double> tau{ cos(theta), sin(theta) };
+						vec2<double> n{ -sin(theta), cos(theta) };
+
+						double ita(offset / playerWHalf);
+						ita = ita * ita / 2;
+						vec2<double> v1(n);
+						if (offset >= 0)v1 += ita * tau;
+						else v1 -= ita * tau;
+
+						v = v1.normalize();
+						r = its[c0].point + v * (ballSpeed * dt - its[c0].t1);
+						v *= ballSpeed;
+						flag = false;
+					}
+					break;
+				}
+			}
+			if (flag)r = r1;
+		}
+
+	};
+
 	struct RealPlayer :Player
 	{
 		bool A_key;
@@ -96,8 +230,35 @@ namespace OpenGL
 			else return Stop;
 		}
 	};
+	struct SimpleAI :Player
+	{
+		Physics* physics;
+		unsigned int id;
 
+		SimpleAI(Physics* _physics, unsigned int _id)
+			:
+			physics(_physics),
+			id(_id)
+		{
 
+		}
+		virtual Movement update()override
+		{
+			double t1(physics->its[id].t1);
+			double t2(physics->its[id].t2);
+			if (t2 >= -0.5 && t2 <= 1.5 && t1 > 0)
+			{
+				double target(t2 * 2 - 1);
+				if (target > physics->inputs[id].pos)return Right;
+				else return Left;
+			}
+			else
+			{
+				if (physics->inputs[id].pos > 0)return Left;
+				else return Right;
+			}
+		}
+	};
 
 	struct HexPong :OpenGL
 	{
@@ -362,17 +523,10 @@ namespace OpenGL
 		BallRenderer ballRenderer;
 
 		RealPlayer realPlayer;
-		Player defaultPlayer[5];
+		SimpleAI simpleAIs[5];
 		Player* players[6];
-		Input inputs[6];
-		double offsets[6];
 
-		Math::vec2<double> ball;
-		Math::vec2<double> velocity;
-
-		std::mt19937_64 mt;
-		std::uniform_real_distribution<float> rd;
-		std::uniform_real_distribution<float> rd1;
+		Physics physics;
 
 		HexPong()
 			:
@@ -381,17 +535,13 @@ namespace OpenGL
 			playerRenderer(&sm),
 			ballRenderer(&sm),
 			realPlayer(),
-			defaultPlayer{},
+			simpleAIs{ {&physics,1}, {&physics,2}, {&physics,3}, {&physics,4}, {&physics,5} },
 			players{ 0 },
-			ball{ 0 },
-			velocity{ 0,-ballSpeed },
-			mt(time(nullptr)),
-			rd(-1 + playerW, 1 - playerW),
-			rd1(-0.5, 0.5)
+			physics()
 		{
 			players[0] = &realPlayer;
 			for (unsigned int c0(0); c0 < 5; ++c0)
-				players[c0 + 1] = defaultPlayer + c0;
+				players[c0 + 1] = simpleAIs + c0;
 		}
 
 		bool isInHexagon()
@@ -407,7 +557,7 @@ namespace OpenGL
 		virtual void init(FrameScale const& _size) override
 		{
 			glViewport(0, 0, _size.w, _size.h);
-			glPointSize(20);
+			glPointSize(10);
 
 			renderer.bufferArray.dataInit();
 
@@ -418,25 +568,17 @@ namespace OpenGL
 		}
 		virtual void run() override
 		{
-			/*
-			glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);*/
-
-			for (unsigned int c0(0); c0 < 6; ++c0)
-				offsets[c0] = inputs[c0].update(players[c0]->update());
-
-			ball += velocity * dt;
-
+			physics.update(players);
 			renderer.use();
 			renderer.refreshBuffer();
 			renderer.run();
 
 			playerRenderer.use();
-			playerRenderer.refreshBuffer(offsets);
+			playerRenderer.refreshBuffer(physics.offsets);
 			playerRenderer.run();
 
 			ballRenderer.use();
-			ballRenderer.refreshBuffer(ball);
+			ballRenderer.refreshBuffer(physics.r);
 			ballRenderer.run();
 		}
 		virtual void frameSize(int _w, int _h) override

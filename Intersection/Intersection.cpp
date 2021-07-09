@@ -26,7 +26,7 @@ struct LineSegment
 	Intersection intersect(LineSegment b)
 	{
 		Intersection r;
-
+		//todo: pre-test
 		double l1((B - A).length()), l2((b.B - b.A).length());
 		vec2 k1((B - A) / l1), k2((b.B - b.A) / l2);
 		vec2 d(A - b.A);
