@@ -17,3 +17,8 @@ Program:	Ball
 	Vertex		0
 	Fragment	0
 }
+Program:	Circle
+{
+	Vertex		0
+	Fragment	0
+}

@@ -17,11 +17,12 @@ namespace OpenGL
 	constexpr Color blue = { 0.f, 0.f, 1.f };
 	constexpr Color purple = { 127.f / 255.f, 0.f, 1.f };
 
+	constexpr double windowSize = 800;
 	constexpr double scale = 0.9;
 	constexpr double playerW = 0.2;
 	constexpr double playerH = 0.05;
 	constexpr double playerWHalf = playerW / 2;
-	constexpr double frameRate = 80;
+	constexpr double frameRate = 200;
 	constexpr double dt = 144 * 0.005 / frameRate;
 	constexpr double dt2 = dt * dt * 0.5;
 	constexpr double G = 0.2;
@@ -170,7 +171,7 @@ namespace OpenGL
 			double rr(r.length());
 			vec2<double> a;
 			if (rr > r0)a = r * (-G / pow(rr, 3));
-			else a = r * (-G / r03);
+			else a = r * (G / r03);
 			vec2<double> r1 = r + v * dt + a * dt2;
 			v += a * dt;
 
@@ -548,15 +549,62 @@ namespace OpenGL
 			}
 			virtual void run() override
 			{
+				glPointSize(10);
 				glDrawArrays(GL_POINTS, 0, 1);
 			}
 		};
+		struct CircleRenderer :Program
+		{
+			struct CircleData :Buffer::Data
+			{
+				Math::vec2<float> position;
+				CircleData()
+					:
+					Data(DynamicDraw),
+					position{ 0 }
+				{
+				}
+				virtual void* pointer()override
+				{
+					return (void*)position.data;
+				}
+				virtual unsigned int size()override
+				{
+					return sizeof(position);
+				}
+			};
 
+			CircleData circleData;
+			Buffer ballBuffer;
+			BufferConfig bufferArray;
+			VertexAttrib positions;
+
+			CircleRenderer(SourceManager* _SourceManager)
+				:
+				Program(_SourceManager, "Circle", Vector<VertexAttrib*>{&positions}),
+				circleData(),
+				ballBuffer(&circleData),
+				bufferArray(&ballBuffer, ArrayBuffer),
+				positions(&bufferArray, 0, VertexAttrib::two,
+					VertexAttrib::Float, false, sizeof(Math::vec2<float>), 0, 0)
+			{
+				init();
+			}
+			virtual void initBufferData()override
+			{
+			}
+			virtual void run() override
+			{
+				glPointSize(windowSize * scale * r0);
+				glDrawArrays(GL_POINTS, 0, 1);
+			}
+		};
 
 		SourceManager sm;
 		BorderRenderer renderer;
 		PlayerRenderer playerRenderer;
 		BallRenderer ballRenderer;
+		CircleRenderer circleRenderer;
 
 		RealPlayer realPlayer;
 		EasyAI simpleAIs[3];
@@ -571,6 +619,7 @@ namespace OpenGL
 			renderer(&sm),
 			playerRenderer(&sm),
 			ballRenderer(&sm),
+			circleRenderer(&sm),
 			realPlayer(),
 			simpleAIs{ {&physics,1}, {&physics,3}, {&physics,5} },
 			brutalAIs{ {&physics,2}, {&physics,4} },
@@ -586,20 +635,9 @@ namespace OpenGL
 				players[2 * c0 + 2] = brutalAIs + c0;
 		}
 
-		bool isInHexagon()
-		{
-			using namespace Math;
-
-
-			if (abs(0 - 2 * Pi) < 0.05)
-				return true;//...
-			else return false;
-		}
-
 		virtual void init(FrameScale const& _size) override
 		{
 			glViewport(0, 0, _size.w, _size.h);
-			glPointSize(10);
 
 			renderer.bufferArray.dataInit();
 
@@ -607,6 +645,8 @@ namespace OpenGL
 			playerRenderer.offsetUniform.dataInit();
 
 			ballRenderer.bufferArray.dataInit();
+
+			circleRenderer.bufferArray.dataInit();
 		}
 		virtual void run() override
 		{
@@ -619,9 +659,13 @@ namespace OpenGL
 			playerRenderer.refreshBuffer(physics.offsets);
 			playerRenderer.run();
 
+			circleRenderer.use();
+			circleRenderer.run();
+
 			ballRenderer.use();
 			ballRenderer.refreshBuffer(physics.r);
 			ballRenderer.run();
+
 		}
 		virtual void frameSize(int _w, int _h) override
 		{
@@ -671,8 +715,8 @@ int main()
 	{
 		"HexPong",
 		{
-			{800,800},
-			true,false
+			{OpenGL::windowSize, OpenGL::windowSize},
+			true, false
 		}
 	};
 	Window::WindowManager wm(winParameters);
