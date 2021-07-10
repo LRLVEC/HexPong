@@ -30,7 +30,7 @@ namespace OpenGL
 	constexpr double leftLimit = playerW - 1;
 	constexpr double rightLimit = 1 - playerW;
 	constexpr double playerSpeed = 2.0;
-	constexpr double ballSpeed = playerSpeed * 0.8 / rightLimit;
+	constexpr double ballSpeed = playerSpeed * 0.9 / rightLimit;
 
 	enum Movement
 	{
@@ -559,8 +559,8 @@ namespace OpenGL
 		BallRenderer ballRenderer;
 
 		RealPlayer realPlayer;
-		EasyAI simpleAIs[3];
-		BrutalAI brutalAIs[2];
+		//EasyAI simpleAIs[2];
+		BrutalAI brutalAIs[5];
 		Player* players[6];
 
 		Physics physics;
@@ -572,18 +572,18 @@ namespace OpenGL
 			playerRenderer(&sm),
 			ballRenderer(&sm),
 			realPlayer(),
-			simpleAIs{ {&physics,1}, {&physics,3}, {&physics,5} },
-			brutalAIs{ {&physics,2}, {&physics,4} },
+			brutalAIs{ {&physics,1},{&physics,2},{&physics,3},{&physics,4},{&physics,5} },
+			//simpleAIs{ {&physics,2}, {&physics,4} },
 			players{ 0 },
 			physics()
 		{
 			players[0] = &realPlayer;
-			for (unsigned int c0(0); c0 < 3; ++c0)
-			{
-				players[2 * c0 + 1] = simpleAIs + c0;
-			}
-			for (unsigned int c0(0); c0 < 2; ++c0)
-				players[2 * c0 + 2] = brutalAIs + c0;
+			//for (unsigned int c0(0); c0 < 3; ++c0)
+			//{
+			//	players[2 * c0 + 1] = brutalAIs + c0;
+			//}
+			for (unsigned int c0(0); c0 < 5; ++c0)
+				players[c0 + 1] = brutalAIs + c0;
 		}
 
 		bool isInHexagon()
@@ -659,13 +659,6 @@ namespace OpenGL
 
 int main()
 {
-	using namespace Math;
-
-	vec2<float> a{ .5f, 1.f };
-	vec2<float> b{ 1.f, .5f };
-
-	printf("%f\n", acos((a, b) / (a.length() * b.length())));
-
 	OpenGL::OpenGLInit init(4, 5);
 	Window::Window::Data winParameters
 	{
