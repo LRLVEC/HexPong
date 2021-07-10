@@ -18,19 +18,19 @@ namespace OpenGL
 	constexpr Color purple = { 127.f / 255.f, 0.f, 1.f };
 
 	constexpr double scale = 0.9;
-	constexpr double playerW = 0.3;
+	constexpr double playerW = 0.2;
 	constexpr double playerH = 0.05;
 	constexpr double playerWHalf = playerW / 2;
-	constexpr double frameRate = 144;
+	constexpr double frameRate = 80;
 	constexpr double dt = 144 * 0.005 / frameRate;
 	constexpr double dt2 = dt * dt * 0.5;
-	constexpr double G = 0.1;
+	constexpr double G = 0.2;
 	constexpr double r0 = 0.1;
 	constexpr double r03 = r0 * r0 * r0;
 	constexpr double leftLimit = playerW - 1;
 	constexpr double rightLimit = 1 - playerW;
 	constexpr double playerSpeed = 2.0;
-	constexpr double ballSpeed = playerSpeed * 0.6 / rightLimit;
+	constexpr double ballSpeed = playerSpeed * 0.8 / rightLimit;
 
 	enum Movement
 	{
@@ -143,8 +143,8 @@ namespace OpenGL
 
 		Physics()
 			:
-			r{ 0.1, 0 },
-			v{ 0, -ballSpeed },
+			r{ 0.01, 0 },
+			v{ 0, -1.5 * ballSpeed },
 			offsets{ 0 },
 			its{}
 		{
@@ -169,8 +169,8 @@ namespace OpenGL
 			using namespace Math;
 			double rr(r.length());
 			vec2<double> a;
-			if (rr > r0)a = r * (G / pow(rr, 3));
-			else a = r * (G / r03);
+			if (rr > r0)a = r * (-G / pow(rr, 3));
+			else a = r * (-G / r03);
 			vec2<double> r1 = r + v * dt + a * dt2;
 			v += a * dt;
 
@@ -202,6 +202,10 @@ namespace OpenGL
 						v *= ballSpeed;
 						flag = false;
 					}
+					else
+					{
+						printf("Player %u lost!\n", c0);
+					}
 					break;
 				}
 			}
@@ -230,12 +234,44 @@ namespace OpenGL
 			else return Stop;
 		}
 	};
-	struct SimpleAI :Player
+	struct EasyAI :Player
+	{
+		Physics* physics;
+		unsigned int id;
+		EasyAI(Physics* _physics, unsigned int _id)
+			:
+			physics(_physics),
+			id(_id)
+		{
+
+		}
+		virtual Movement update()override
+		{
+			using namespace Math;
+			double theta((Math::Pi * id) / 3);
+			vec2<double> n{ -sin(theta), cos(theta) };
+			Physics::LineSegment dr(physics->r, physics->r + n);
+			double t2 = dr.intersect(physics->lines[id]).t2;
+
+			if (t2 >= -0.1 && t2 <= 1.1)
+			{
+				double target(t2 * 2 - 1);
+				if (target > physics->inputs[id].pos)return Right;
+				else return Left;
+			}
+			else
+			{
+				if (physics->inputs[id].pos > 0)return Left;
+				else return Right;
+			}
+		}
+	};
+	struct BrutalAI :Player
 	{
 		Physics* physics;
 		unsigned int id;
 
-		SimpleAI(Physics* _physics, unsigned int _id)
+		BrutalAI(Physics* _physics, unsigned int _id)
 			:
 			physics(_physics),
 			id(_id)
@@ -523,7 +559,8 @@ namespace OpenGL
 		BallRenderer ballRenderer;
 
 		RealPlayer realPlayer;
-		SimpleAI simpleAIs[5];
+		EasyAI simpleAIs[3];
+		BrutalAI brutalAIs[2];
 		Player* players[6];
 
 		Physics physics;
@@ -535,13 +572,18 @@ namespace OpenGL
 			playerRenderer(&sm),
 			ballRenderer(&sm),
 			realPlayer(),
-			simpleAIs{ {&physics,1}, {&physics,2}, {&physics,3}, {&physics,4}, {&physics,5} },
+			simpleAIs{ {&physics,1}, {&physics,3}, {&physics,5} },
+			brutalAIs{ {&physics,2}, {&physics,4} },
 			players{ 0 },
 			physics()
 		{
 			players[0] = &realPlayer;
-			for (unsigned int c0(0); c0 < 5; ++c0)
-				players[c0 + 1] = simpleAIs + c0;
+			for (unsigned int c0(0); c0 < 3; ++c0)
+			{
+				players[2 * c0 + 1] = simpleAIs + c0;
+			}
+			for (unsigned int c0(0); c0 < 2; ++c0)
+				players[2 * c0 + 2] = brutalAIs + c0;
 		}
 
 		bool isInHexagon()
