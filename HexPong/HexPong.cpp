@@ -22,7 +22,7 @@ namespace OpenGL
 	constexpr double playerW = 0.2;
 	constexpr double playerH = 0.05;
 	constexpr double playerWHalf = playerW / 2;
-	constexpr double frameRate = 110;
+	constexpr double frameRate = 80;
 	constexpr double dt = 144 * 0.005 / frameRate;
 	constexpr double dt2 = dt * dt * 0.5;
 	constexpr double G = 0.3;
@@ -31,7 +31,7 @@ namespace OpenGL
 	constexpr double leftLimit = playerW - 1;
 	constexpr double rightLimit = 1 - playerW;
 	constexpr double playerSpeed = 2.0;
-	constexpr double ballSpeed = playerSpeed * 0.8 / rightLimit;
+	constexpr double ballSpeed = playerSpeed * 0.9 / rightLimit;
 
 	enum Movement
 	{
@@ -144,7 +144,7 @@ namespace OpenGL
 
 		Physics()
 			:
-			r{ 0, -0.2 },
+			r{ 0.2, 0 },
 			v{ 0, -1.2 * ballSpeed },
 			offsets{ 0 },
 			its{}
@@ -651,20 +651,17 @@ namespace OpenGL
 			circleRenderer(&sm),
 			realPlayer0(),
 			realPlayer1(),
-			brutalAIs{ {&physics,0},{&physics,2},{&physics,3},{&physics,4} },
+			brutalAIs{ {&physics,1},{&physics,2},{&physics,4},{&physics,5} },
 			//simpleAIs{ {&physics,2}, {&physics,4} },
 			players{ 0 },
 			physics()
 		{
-			players[1] = &realPlayer1;
-			players[5] = &realPlayer0;
-			//for (unsigned int c0(0); c0 < 3; ++c0)
-			//{
-			//	players[2 * c0 + 1] = brutalAIs + c0;
-			//}
-			players[0] = brutalAIs;
-			for (unsigned int c0(1); c0 < 4; ++c0)
-				players[c0 + 1] = brutalAIs + c0;
+			players[0] = &realPlayer0;
+			players[3] = &realPlayer1;
+			players[1] = brutalAIs;
+			players[2] = brutalAIs + 1;
+			players[4] = brutalAIs + 2;
+			players[5] = brutalAIs + 3;
 		}
 
 		virtual void init(FrameScale const& _size) override
