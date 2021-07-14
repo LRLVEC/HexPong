@@ -22,16 +22,16 @@ namespace OpenGL
 	constexpr double playerW = 0.2;
 	constexpr double playerH = 0.05;
 	constexpr double playerWHalf = playerW / 2;
-	constexpr double frameRate = 200;
+	constexpr double frameRate = 110;
 	constexpr double dt = 144 * 0.005 / frameRate;
 	constexpr double dt2 = dt * dt * 0.5;
-	constexpr double G = 0.2;
+	constexpr double G = 0.3;
 	constexpr double r0 = 0.1;
 	constexpr double r03 = r0 * r0 * r0;
 	constexpr double leftLimit = playerW - 1;
 	constexpr double rightLimit = 1 - playerW;
 	constexpr double playerSpeed = 2.0;
-	constexpr double ballSpeed = playerSpeed * 0.9 / rightLimit;
+	constexpr double ballSpeed = playerSpeed * 0.8 / rightLimit;
 
 	enum Movement
 	{
@@ -144,8 +144,8 @@ namespace OpenGL
 
 		Physics()
 			:
-			r{ 0.01, 0 },
-			v{ 0, -1.5 * ballSpeed },
+			r{ 0, -0.2 },
+			v{ 0, -1.2 * ballSpeed },
 			offsets{ 0 },
 			its{}
 		{
@@ -171,7 +171,7 @@ namespace OpenGL
 			double rr(r.length());
 			vec2<double> a;
 			if (rr > r0)a = r * (-G / pow(rr, 3));
-			else a = r * (G / r03);
+			else a = r * (2 * G / pow(rr, 3));
 			vec2<double> r1 = r + v * dt + a * dt2;
 			v += a * dt;
 
@@ -215,11 +215,11 @@ namespace OpenGL
 
 	};
 
-	struct RealPlayer :Player
+	struct RealPlayer0 :Player
 	{
 		bool A_key;
 		bool D_key;
-		RealPlayer()
+		RealPlayer0()
 			:
 			A_key(false),
 			D_key(false)
@@ -235,6 +235,27 @@ namespace OpenGL
 			else return Stop;
 		}
 	};
+	struct RealPlayer1 :Player
+	{
+		bool L_key;
+		bool R_key;
+		RealPlayer1()
+			:
+			L_key(false),
+			R_key(false)
+		{
+		}
+		virtual Movement update() override
+		{
+			if (L_key ^ R_key)
+			{
+				if (L_key)return Left;
+				else return  Right;
+			}
+			else return Stop;
+		}
+	};
+
 	struct EasyAI :Player
 	{
 		Physics* physics;
@@ -606,9 +627,10 @@ namespace OpenGL
 		BallRenderer ballRenderer;
 		CircleRenderer circleRenderer;
 
-		RealPlayer realPlayer;
+		RealPlayer0 realPlayer0;
+		RealPlayer1 realPlayer1;
 		//EasyAI simpleAIs[2];
-		BrutalAI brutalAIs[5];
+		BrutalAI brutalAIs[4];
 		Player* players[6];
 
 		Physics physics;
@@ -620,18 +642,21 @@ namespace OpenGL
 			playerRenderer(&sm),
 			ballRenderer(&sm),
 			circleRenderer(&sm),
-			realPlayer(),
-			brutalAIs{ {&physics,1},{&physics,2},{&physics,3},{&physics,4},{&physics,5} },
+			realPlayer0(),
+			realPlayer1(),
+			brutalAIs{ {&physics,0},{&physics,2},{&physics,3},{&physics,4} },
 			//simpleAIs{ {&physics,2}, {&physics,4} },
 			players{ 0 },
 			physics()
 		{
-			players[0] = &realPlayer;
+			players[1] = &realPlayer1;
+			players[5] = &realPlayer0;
 			//for (unsigned int c0(0); c0 < 3; ++c0)
 			//{
 			//	players[2 * c0 + 1] = brutalAIs + c0;
 			//}
-			for (unsigned int c0(0); c0 < 5; ++c0)
+			players[0] = brutalAIs;
+			for (unsigned int c0(1); c0 < 4; ++c0)
 				players[c0 + 1] = brutalAIs + c0;
 		}
 
@@ -692,8 +717,10 @@ namespace OpenGL
 				if (_action == GLFW_PRESS)
 					glfwSetWindowShouldClose(_window, true);
 				break;
-			case GLFW_KEY_A:realPlayer.A_key = _action; break;
-			case GLFW_KEY_D:realPlayer.D_key = _action; break;
+			case GLFW_KEY_A:realPlayer0.A_key = _action; break;
+			case GLFW_KEY_D:realPlayer0.D_key = _action; break;
+			case GLFW_KEY_LEFT:realPlayer1.L_key = _action; break;
+			case GLFW_KEY_RIGHT:realPlayer1.R_key = _action; break;
 				//case GLFW_KEY_W: break;
 				//case GLFW_KEY_S: break;
 			}
