@@ -394,13 +394,11 @@ namespace OpenGL
 			}
 			virtual void run() override
 			{
-				glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-				glClear(GL_COLOR_BUFFER_BIT);
 				glDrawArrays(GL_LINE_LOOP, 0, 6);
 			}
 			void resize(int _w, int _h)
 			{
-				glViewport(0, 0, _w, _h);
+				//glViewport(0, 0, _w, _h);
 			}
 		};
 		struct PlayerRenderer :Program
@@ -450,15 +448,16 @@ namespace OpenGL
 					return sizeof(rectangles);
 				}
 			};
-
 			struct OffsetData :Buffer::Data
 			{
 				Math::vec4<float> offsets[6];
+				Math::vec4<unsigned int> inversed;
 
 				OffsetData()
 					:
 					Data(DynamicDraw),
-					offsets{ 0 }
+					offsets{ 0 },
+					inversed{ 0 }
 				{
 				}
 				void update(double* _offsets)
@@ -471,13 +470,17 @@ namespace OpenGL
 						offsets[c0].data[1] = a2 * sin(theta);
 					}
 				}
+				void inverse(bool _inversed)
+				{
+					inversed.data[0] = _inversed;
+				}
 				virtual void* pointer()override
 				{
 					return (void*)offsets;
 				}
 				virtual unsigned int size()override
 				{
-					return sizeof(offsets);
+					return sizeof(offsets) + sizeof(inversed);
 				}
 			};
 
@@ -500,15 +503,19 @@ namespace OpenGL
 				rectangleBuffer(&playerTriangles),
 				offsetBuffer(&playerOffset),
 				bufferArray(&rectangleBuffer, ArrayBuffer),
-				offsetUniform(&offsetBuffer, UniformBuffer, 1),
+				offsetUniform(&offsetBuffer, UniformBuffer, 0),
 				positions(&bufferArray, 0, VertexAttrib::two,
 					VertexAttrib::Float, false, sizeof(Math::vec2<float>), 0, 0)
 			{
 				init();
 			}
-			void refreshBuffer(double* _offsets)
+			void update(double* _offsets)
 			{
 				playerOffset.update(_offsets);
+			}
+			void refreshBuffer(bool _inversed)
+			{
+				playerOffset.inverse(_inversed);
 				offsetUniform.refreshData();
 			}
 			virtual void initBufferData()override
@@ -662,7 +669,6 @@ namespace OpenGL
 
 		virtual void init(FrameScale const& _size) override
 		{
-			glViewport(0, 0, _size.w, _size.h);
 
 			renderer.bufferArray.dataInit();
 
@@ -672,16 +678,24 @@ namespace OpenGL
 			ballRenderer.bufferArray.dataInit();
 
 			circleRenderer.bufferArray.dataInit();
+
 		}
 		virtual void run() override
 		{
 			physics.update(players);
+
+			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+
+			glViewport(0, 0, windowSize, windowSize);
+			playerRenderer.update(physics.offsets);
+			playerRenderer.refreshBuffer(false);
+
 			renderer.use();
 			renderer.refreshBuffer();
 			renderer.run();
 
 			playerRenderer.use();
-			playerRenderer.refreshBuffer(physics.offsets);
 			playerRenderer.run();
 
 			circleRenderer.use();
@@ -691,6 +705,19 @@ namespace OpenGL
 			ballRenderer.refreshBuffer(physics.r);
 			ballRenderer.run();
 
+			glViewport(windowSize, 0, windowSize, windowSize);
+			playerRenderer.refreshBuffer(true);
+			renderer.use();
+			renderer.run();
+
+			playerRenderer.use();
+			playerRenderer.run();
+
+			circleRenderer.use();
+			circleRenderer.run();
+
+			ballRenderer.use();
+			ballRenderer.run();
 		}
 		virtual void frameSize(int _w, int _h) override
 		{
@@ -735,7 +762,7 @@ int main()
 	{
 		"HexPong",
 		{
-			{OpenGL::windowSize, OpenGL::windowSize},
+			{2 * OpenGL::windowSize, OpenGL::windowSize},
 			true, false
 		}
 	};
