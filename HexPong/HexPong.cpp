@@ -141,14 +141,19 @@ namespace OpenGL
 		double offsets[6];
 		Input inputs[6];
 		LineSegment::Intersection its[6];
+		unsigned int lostPlayer;
+		bool ended;
 
 		Physics()
 			:
-			r{ 0.2, 0 },
+			r{ 0.17, 0 },
 			v{ 0, -1.2 * ballSpeed },
 			offsets{ 0 },
-			its{}
+			its{},
+			lostPlayer(0),
+			ended(false)
 		{
+			init();
 			double h = sqrt(3) / 2;
 
 			Math::vec2<double> vertices[6];
@@ -164,6 +169,16 @@ namespace OpenGL
 				lines[c0].A = vertices[c0];
 				lines[c0].B = vertices[(c0 + 1) % 6];
 			}
+		}
+		void init()
+		{
+			double theta = lostPlayer * Math::Pi / 3;
+			r = Math::vec2<double>{ 0.3 * sin(theta), -0.3 * cos(theta) };
+			v = Math::vec2<double>{ 1 * ballSpeed * sin(theta), -1 * ballSpeed * cos(theta) };
+			for (unsigned int c0(0); c0 < 6; ++c0)
+				inputs[c0].pos = 0;
+			for (unsigned int c0(0); c0 < 6; ++c0)
+				offsets[c0] = inputs[c0].update(Stop);
 		}
 		void update(Player** players)
 		{
@@ -205,6 +220,8 @@ namespace OpenGL
 					}
 					else
 					{
+						lostPlayer = c0;
+						ended = true;
 						printf("Player %u lost!\n", c0);
 					}
 					break;
@@ -641,6 +658,8 @@ namespace OpenGL
 		Player* players[6];
 
 		Physics physics;
+		unsigned int frames;
+		unsigned int losts[6];
 
 		HexPong()
 			:
@@ -654,7 +673,9 @@ namespace OpenGL
 			brutalAIs{ {&physics,1},{&physics,2},{&physics,4},{&physics,5} },
 			//simpleAIs{ {&physics,2}, {&physics,4} },
 			players{ 0 },
-			physics()
+			physics(),
+			frames(60),
+			losts{ 0 }
 		{
 			players[0] = &realPlayer0;
 			players[3] = &realPlayer1;
@@ -662,6 +683,14 @@ namespace OpenGL
 			players[2] = brutalAIs + 1;
 			players[4] = brutalAIs + 2;
 			players[5] = brutalAIs + 3;
+		}
+
+		void printScores()
+		{
+			for (unsigned int c0(0); c0 < 6; ++c0)
+			{
+				printf("Player %u Losts: %u\n", c0, losts[c0]);
+			}
 		}
 
 		virtual void init(FrameScale const& _size) override
@@ -679,7 +708,16 @@ namespace OpenGL
 		}
 		virtual void run() override
 		{
-			physics.update(players);
+			if (frames)frames--;
+			if (frames == 0)
+				physics.update(players);
+			if (physics.ended)
+			{
+				losts[physics.lostPlayer]++;
+				frames = 180;
+				physics.ended = false;
+				physics.init();
+			}
 
 			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
@@ -778,5 +816,7 @@ int main()
 		::printf("\r%.2lf    ", fps.fps);
 		//fps.printFPS(1);
 	}
+	printf("\m");
+	test.printScores();
 	return 0;
 }
